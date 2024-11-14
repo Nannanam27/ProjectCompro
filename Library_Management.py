@@ -54,9 +54,6 @@ class MainScreen(Screen):
         search_frame = ctk.CTkFrame(content_frame)
         search_frame.grid(row=0, column=1, padx=(10, 20), pady=10, sticky="n")
 
-        search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search", width=280)
-        search_entry.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
         self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="Search", width=280)
         self.search_entry.grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.search_entry.bind("<KeyRelease>", lambda event: self.search_books())
@@ -66,25 +63,15 @@ class MainScreen(Screen):
 
         self.selected_item_var = ctk.StringVar()
         
-        items = self.load_book_titles()
+        self.update_radio_buttons(self.load_data_from_file("book_data.pkl", lambda book: book.get("Book Title", "Unknown Title")))
 
-        for item in items:
-            radiobutton = ctk.CTkRadioButton(
-                self.scrollable_list_frame,
-                text=item,
-                value=item,
-                variable=self.selected_item_var,
-                command=self.update_entry_fields
-            )
-            radiobutton.pack(anchor="w", padx=10, pady=2)
-    
         button_frame = ctk.CTkFrame(self)
         button_frame.pack(pady=20)
 
-        btn_add = ctk.CTkButton(button_frame, text="Add Data", width=100, height=40,font=ctk.CTkFont(size=14), command=self.add_data)
+        btn_add = ctk.CTkButton(button_frame, text="Add Data", width=100, height=40, font=ctk.CTkFont(size=14), command=self.add_data)
         btn_add.grid(row=0, column=0, padx=10, pady=10)
 
-        btn_history = ctk.CTkButton(button_frame, text="History", width=100, height=40,font=ctk.CTkFont(size=14), command=self.system.show_history_screen)
+        btn_history = ctk.CTkButton(button_frame, text="History", width=100, height=40, font=ctk.CTkFont(size=14), command=self.system.show_history_screen)
         btn_history.grid(row=0, column=1, padx=10, pady=10)
 
         btn_book_data = ctk.CTkButton(button_frame, text="Book Data", width=100, height=40, font=ctk.CTkFont(size=14), command=self.system.show_book_data_screen)
@@ -95,65 +82,62 @@ class MainScreen(Screen):
 
         content_frame.grid_columnconfigure(0, weight=1)
         content_frame.grid_columnconfigure(1, weight=1)
-    
-    def load_book_titles(self):
-        data_file = "book_data.pkl"
-        book_titles = []
-        if os.path.exists(data_file):
-            with open(data_file, "rb") as file:
-                all_books = pickle.load(file)
-                for book in all_books:
-                    book_titles.append(book.get("Book Title", "Unknown Title"))
-        return book_titles
+
+    def load_data_from_file(self, file_name, extract_func):
+        try:
+            if os.path.exists(file_name):
+                with open(file_name, "rb") as file:
+                    data = pickle.load(file)
+                    return [extract_func(item) for item in data]
+            return []
+        except (OSError, pickle.UnpicklingError) as e:
+            self.show_popup("Error", f"Error loading file '{file_name}': {str(e)}")
+            return []
 
     def update_entry_fields(self):
-        selected_title = self.selected_item_var.get()
-        book_info = self.get_book_info_by_title(selected_title)
+        try:
+            selected_title = self.selected_item_var.get()
+            book_info = self.get_data("book_data.pkl", "Book Title", selected_title)
 
-        if book_info:
-            self.entries["Book ID"].delete(0, "end")
-            self.entries["Book Title"].delete(0, "end")
-            self.entries["Book ID"].insert(0, book_info.get("Book ID", ""))
-            self.entries["Book Title"].insert(0, book_info.get("Book Title", ""))
+            if book_info:
+                self.entries["Book ID"].delete(0, "end")
+                self.entries["Book Title"].delete(0, "end")
+                self.entries["Book ID"].insert(0, book_info.get("Book ID", ""))
+                self.entries["Book Title"].insert(0, book_info.get("Book Title", ""))
 
-            today = datetime.today().strftime("%Y-%m-%d")
-            self.entries["Date Borrowed"].delete(0, "end")
-            self.entries["Date Borrowed"].insert(0, today)
+                today = datetime.today().strftime("%Y-%m-%d")
+                self.entries["Date Borrowed"].delete(0, "end")
+                self.entries["Date Borrowed"].insert(0, today)
 
-            date_borrowed_obj = datetime.strptime(today, "%Y-%m-%d")
-            date_return_obj = date_borrowed_obj + timedelta(days=15)
+                date_borrowed_obj = datetime.strptime(today, "%Y-%m-%d")
+                date_return_obj = date_borrowed_obj + timedelta(days=15)
 
-            self.entries["Date Return"].delete(0, "end")
-            self.entries["Date Return"].insert(0, date_return_obj.strftime("%Y-%m-%d"))
+                self.entries["Date Return"].delete(0, "end")
+                self.entries["Date Return"].insert(0, date_return_obj.strftime("%Y-%m-%d"))
+        except Exception as e:
+            self.show_popup("Error", f"Error updating entry fields: {str(e)}")
 
     def search_books(self):
         search = self.search_entry.get().lower()
-        all_titles = self.load_book_titles()
-
-        matching_titles = [title for title in all_titles if search in title.lower()]
-
-        try:
-            if not matching_titles:
-                raise ValueError("No books found.")
-
-            self.update_radio_buttons(matching_titles)
-
-        except ValueError as e:
-            self.update_label("No books found")
+        matching_titles = [title for title in self.load_data_from_file("book_data.pkl", lambda book: book.get("Book Title", "Unknown Title")) if search in title.lower()]
+        self.update_radio_buttons(matching_titles)
 
     def update_radio_buttons(self, items):
         for widget in self.scrollable_list_frame.winfo_children():
             widget.destroy()  
 
-        for item in items:
-            radiobutton = ctk.CTkRadioButton(
-                self.scrollable_list_frame,
-                text=item,
-                value=item,
-                variable=self.selected_item_var,
-                command=self.update_entry_fields
-            )
-            radiobutton.pack(anchor="w", padx=10, pady=2)
+        if items:
+            for item in items:
+                radiobutton = ctk.CTkRadioButton(
+                    self.scrollable_list_frame,
+                    text=item,
+                    value=item,
+                    variable=self.selected_item_var,
+                    command=self.update_entry_fields
+                )
+                radiobutton.pack(anchor="w", padx=10, pady=2)
+        else:
+            self.update_label("No books found")
 
     def update_label(self, message):
         for widget in self.scrollable_list_frame.winfo_children():
@@ -162,79 +146,58 @@ class MainScreen(Screen):
         label = ctk.CTkLabel(self.scrollable_list_frame, text=message, font=ctk.CTkFont(size=14))
         label.pack(anchor="w", padx=10, pady=5)
 
-    def get_book_info_by_title(self, title):
-        data_file = "book_data.pkl"
-        if os.path.exists(data_file):
-            with open(data_file, "rb") as file:
-                all_books = pickle.load(file)
-                for book in all_books:
-                    if book.get("Book Title") == title:
-                        return book
+
+    def get_data(self, file_name, field, value):
+        data = self.load_data_from_file(file_name, lambda item: item)
+        for item in data:
+            if item.get(field) == value:
+                return item
         return None
 
     def add_data(self):
+        for field in ["First Name", "Last Name", "Book ID", "Book Title", "Date Borrowed", "Date Return"]:
+            if not self.entries[field].get().strip():  
+                self.show_popup("Error", f"Please fill in the '{field}' field.")
+                return  
+
         book_id = self.entries["Book ID"].get()
         if not self.is_book_available(book_id):
-            confirmation_popup = ctk.CTkToplevel(self)
-            confirmation_popup.geometry("300x150")
-            confirmation_popup.title("Error")
-            error_label = ctk.CTkLabel(confirmation_popup, text="This book is already borrowed.", font=ctk.CTkFont(size=14))
-            error_label.pack(pady=20)
-            ok_button = ctk.CTkButton(confirmation_popup, text="OK", command=confirmation_popup.destroy)
-            ok_button.pack(pady=10)
+            self.show_popup("Error", "This book is already borrowed.")
             return
 
         name = self.entries["First Name"].get() + " " + self.entries["Last Name"].get()
-        book_id = self.entries["Book ID"].get()
-        book_title = self.entries["Book Title"].get()
-        date_borrowed = self.entries["Date Borrowed"].get()
-        date_return = self.entries["Date Return"].get()
-
         history_data = {
             "Borrower Name": name,
             "Book ID": book_id,
-            "Book Title": book_title,
-            "Date Borrowed": date_borrowed,
-            "Date Return": date_return,
+            "Book Title": self.entries["Book Title"].get(),
+            "Date Borrowed": self.entries["Date Borrowed"].get(),
+            "Date Return": self.entries["Date Return"].get(),
         }
 
-        history_file = "history.pkl"
-        if os.path.exists(history_file):
-            with open(history_file, "rb") as file:
-                all_history = pickle.load(file)
-        else:
-            all_history = []
-
-        all_history.append(history_data)
-        with open(history_file, "wb") as file:
-            pickle.dump(all_history, file)
-
-        self.mark_book_as_unavailable(book_id)
-
-        confirmation_popup = ctk.CTkToplevel(self)
-        confirmation_popup.geometry("300x150")
-        confirmation_popup.title("Confirmation")
-        confirmation_label = ctk.CTkLabel(confirmation_popup, text="Book borrowed successfully!", font=ctk.CTkFont(size=14))
-        confirmation_label.pack(pady=20)
-        ok_button = ctk.CTkButton(confirmation_popup, text="OK", command=confirmation_popup.destroy)
-        ok_button.pack(pady=10)
+        self.save_to_file("history.pkl", history_data)
+        self.update_book_status(book_id, available=False)
+        
+        self.show_popup("Confirmation", "Book borrowed successfully!")
 
         for entry in self.entries.values():
             entry.delete(0, "end")
 
         self.history_data_screen.load_and_display_history()
 
-    def is_book_available(self, book_id):
-        data_file = "book_data.pkl"
-        if os.path.exists(data_file):
-            with open(data_file, "rb") as file:
-                all_books = pickle.load(file)
-                for book in all_books:
-                    if book.get("Book ID") == book_id:
-                        return book.get("Available", True)
-        return False
+    def show_popup(self, title, message):
+        popup = ctk.CTkToplevel(self)
+        popup.geometry("300x150")
+        popup.title(title)
+        label = ctk.CTkLabel(popup, text=message, font=ctk.CTkFont(size=14))
+        label.pack(pady=20)
+        ok_button = ctk.CTkButton(popup, text="OK", command=popup.destroy)
+        ok_button.pack(pady=10)
 
-    def mark_book_as_unavailable(self, book_id):
+    def is_book_available(self, book_id):
+        return self.get_data_by_field("book_data.pkl", "Book ID", book_id).get("Available", True)
+
+
+    def update_book_status(self, book_id, available):
         data_file = "book_data.pkl"
         if os.path.exists(data_file):
             with open(data_file, "rb") as file:
@@ -242,9 +205,21 @@ class MainScreen(Screen):
 
             for book in all_books:
                 if book.get("Book ID") == book_id:
-                    book["Available"] = False  
+                    book["Available"] = available
+
             with open(data_file, "wb") as file:
                 pickle.dump(all_books, file)
+
+    def save_to_file(self, file_name, data):
+        if os.path.exists(file_name):
+            with open(file_name, "rb") as file:
+                all_data = pickle.load(file)
+        else:
+            all_data = []
+
+        all_data.append(data)
+        with open(file_name, "wb") as file:
+            pickle.dump(all_data, file)
 
 class BookDataScreen(Screen):
     def __init__(self, parent, system, main):
@@ -341,7 +316,7 @@ class BookDataScreen(Screen):
                 with open(data_file, "wb") as file:
                     pickle.dump(updated_books, file)
 
-        self.main_screen.update_radio_buttons(self.main_screen.load_book_titles())  
+        self.main_screen.update_radio_buttons(self.main_screen.self.load_data_from_file("book_data.pkl", lambda book: book.get("Book Title", "Unknown Title")))  
     
 class HistoryScreen(Screen):
     def __init__(self, parent, system):
@@ -437,7 +412,7 @@ class HistoryScreen(Screen):
         book_id = self.get_book_id_by_title(book_title)
 
         if book_id:
-            self.mark_book_as_available(book_id)
+            self.update_book_status(book_id, available=False)
             self.update_history_as_returned(book_id)
 
             self.load_and_display_history()
