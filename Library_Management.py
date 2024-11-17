@@ -22,9 +22,7 @@ class MainScreen(Screen):
         super().__init__(parent)
         self.system = system
         self.history_data_screen = history_data_screen
-        self.create_widgets()
-
-    def create_widgets(self):
+        
         title_frame = ctk.CTkFrame(self, fg_color="#3B8ED0", corner_radius=0)
         title_frame.pack(pady=20)
         
@@ -39,6 +37,7 @@ class MainScreen(Screen):
         content_frame = ctk.CTkFrame(self)
         content_frame.pack(pady=10, padx=20, fill="both", expand=True)
 
+        #Left
         input_frame = ctk.CTkFrame(content_frame)
         input_frame.grid(row=0, column=0, padx=(20, 10), pady=10, sticky="n")
 
@@ -51,6 +50,7 @@ class MainScreen(Screen):
             entry.grid(row=i, column=1, pady=5, padx=5, sticky="w")
             self.entries[label] = entry
 
+        #Right
         search_frame = ctk.CTkFrame(content_frame)
         search_frame.grid(row=0, column=1, padx=(10, 20), pady=10, sticky="n")
 
@@ -65,6 +65,7 @@ class MainScreen(Screen):
         
         self.update_radio_buttons(self.load_data_from_file("book_data.pkl", lambda book: book.get("Book Title", "Unknown Title")))
 
+        #Button
         button_frame = ctk.CTkFrame(self)
         button_frame.pack(pady=20)
 
@@ -91,10 +92,10 @@ class MainScreen(Screen):
                     return [extract(item) for item in data]
             return []
         except (OSError, pickle.UnpicklingError) as e:
-            self.show_popup("Error", f"Error loading file '{file_name}': {str(e)}")
+            self.popup("Error", f"Error loading file '{file_name}': {str(e)}")
             return []
 
-    def update_entry_fields(self):
+    def update_entry(self):
         try:
             selected_title = self.selected_item_var.get()
             book_info = self.get_data("book_data.pkl", "Book Title", selected_title)
@@ -115,7 +116,7 @@ class MainScreen(Screen):
                 self.entries["Date Return"].delete(0, "end")
                 self.entries["Date Return"].insert(0, date_return_obj.strftime("%Y-%m-%d"))
         except Exception as e:
-            self.show_popup("Error", f"Error updating entry fields: {str(e)}")
+            self.popup("Error", f"Error updating entry fields: {str(e)}")
 
     def search_books(self):
         search = self.search_entry.get().lower()
@@ -133,7 +134,7 @@ class MainScreen(Screen):
                     text=item,
                     value=item,
                     variable=self.selected_item_var,
-                    command=self.update_entry_fields
+                    command=self.update_entry
                 )
                 radiobutton.pack(anchor="w", padx=10, pady=2)
         else:
@@ -157,12 +158,12 @@ class MainScreen(Screen):
     def add_data(self):
         for field in ["First Name", "Last Name", "Book ID", "Book Title", "Date Borrowed", "Date Return"]:
             if not self.entries[field].get().strip():  
-                self.show_popup("Error", f"Please fill in the '{field}' field.")
+                self.popup("Error", f"Please fill in the '{field}' field.")
                 return  
 
         book_id = self.entries["Book ID"].get()
         if not self.is_book_available(book_id):
-            self.show_popup("Error", "This book is already borrowed.")
+            self.popup("Error", "This book is already borrowed.")
             return
 
         name = self.entries["First Name"].get() + " " + self.entries["Last Name"].get()
@@ -177,14 +178,14 @@ class MainScreen(Screen):
         self.save_to_file("history.pkl", history_data)
         self.update_book_status(book_id, available=False)
         
-        self.show_popup("Confirmation", "Book borrowed successfully!")
+        self.popup("Confirmation", "Book borrowed successfully!")
 
         for entry in self.entries.values():
             entry.delete(0, "end")
 
-        self.history_data_screen.load_and_display_history()
+        self.history_data_screen.display_history()
 
-    def show_popup(self, title, message):
+    def popup(self, title, message):
         popup = ctk.CTkToplevel(self)
         popup.geometry("300x150")
         popup.title(title)
@@ -225,9 +226,7 @@ class BookDataScreen(Screen):
         super().__init__(parent)
         self.system = system
         self.main_screen = main
-        self.create_widgets()
-
-    def create_widgets(self):
+        
         title_frame = ctk.CTkFrame(self, fg_color="#3B8ED0", corner_radius=0)
         title_frame.pack(fill="x")
         
@@ -241,6 +240,7 @@ class BookDataScreen(Screen):
         self.display_frame = ctk.CTkFrame(self)
         self.display_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
+        ##### display table #####
         columns = ("Book ID", "Book Title", "Author Name", "Genre", "Availability") 
         self.book_tree = ttk.Treeview(self.display_frame, columns=columns, show="headings")
 
@@ -258,6 +258,7 @@ class BookDataScreen(Screen):
         self.book_tree.configure(xscrollcommand=h_scrollbar.set)
         h_scrollbar.pack(side="bottom", fill="x")
 
+        #Button
         button_frame = ctk.CTkFrame(self)
         button_frame.pack(fill="x", padx=20, pady = 10)
         
@@ -273,9 +274,9 @@ class BookDataScreen(Screen):
         back_button = ctk.CTkButton(button_frame, text="Back", width=120, command=self.system.show_main_screen)
         back_button.pack(side="right", padx=20)
 
-        self.load_and_display_books()
+        self.display_books()
 
-    def load_and_display_books(self):
+    def display_books(self):
         for item in self.book_tree.get_children():
             self.book_tree.delete(item)
 
@@ -337,14 +338,13 @@ class HistoryScreen(Screen):
     def __init__(self, parent, system):
         super().__init__(parent)
         self.system = system
-        self.create_widgets()
-
-    def create_widgets(self):
+        
         title_frame = ctk.CTkFrame(self, fg_color="#3B8ED0", corner_radius=0)
         title_frame.pack(fill="x")
         title_label = ctk.CTkLabel(title_frame, text="History", font=ctk.CTkFont(size=18, weight="bold"), text_color="white")
         title_label.pack(pady=5)
 
+        #####Table#####
         self.display_frame = ctk.CTkFrame(self)
         self.display_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
@@ -365,6 +365,7 @@ class HistoryScreen(Screen):
         self.book_tree.configure(xscrollcommand=h_scrollbar.set)
         h_scrollbar.pack(side="bottom", fill="x")
 
+        #Button
         button_frame = ctk.CTkFrame(self)
         button_frame.pack(fill="x", pady=10)
 
@@ -374,9 +375,9 @@ class HistoryScreen(Screen):
         back_button = ctk.CTkButton(button_frame, text="Back", width=120, command=self.system.show_main_screen)
         back_button.pack(side="right", padx=10)
 
-        self.load_and_display_history()
+        self.display_history()
 
-    def load_and_display_history(self):
+    def display_history(self):
         for item in self.book_tree.get_children():
             self.book_tree.delete(item)
 
@@ -427,9 +428,9 @@ class HistoryScreen(Screen):
             return_date = datetime.now().strftime("%Y-%m-%d")
 
             fine = self.calculate_fine(due_date, return_date)
-            self.update_history_as_returned(book_id, return_date, fine)
+            self.returned(book_id, return_date, fine)
 
-            self.load_and_display_history()
+            self.display_history()
 
     def calculate_fine(self, due_date, return_date):
         due_date = datetime.strptime(due_date, "%Y-%m-%d")
@@ -450,7 +451,7 @@ class HistoryScreen(Screen):
                         return book.get("Book ID")
         return None
 
-    def mark_book_as_available(self, book_id):
+    def make_available(self, book_id):
         data_file = "book_data.pkl"
         if os.path.exists(data_file):
             with open(data_file, "rb") as file:
@@ -463,7 +464,7 @@ class HistoryScreen(Screen):
             with open(data_file, "wb") as file:
                 pickle.dump(all_books, file)
 
-    def update_history_as_returned(self, book_id, return_date, fine):
+    def returned(self, book_id, return_date, fine):
         history_file = "history.pkl"
         if os.path.exists(history_file):
             with open(history_file, "rb") as file:
@@ -479,7 +480,7 @@ class HistoryScreen(Screen):
             with open(history_file, "wb") as file:
                 pickle.dump(all_history, file)
 
-        self.mark_book_as_available(book_id)
+        self.make_available(book_id)
 
 class EditBookScreen(Screen):
     def __init__(self, parent, system, book_data, main_screen, book_data_screen):
@@ -488,9 +489,7 @@ class EditBookScreen(Screen):
         self.book_data = book_data  
         self.book_data_screen = book_data_screen
         self.main_screen = main_screen
-        self.create_widgets()
-
-    def create_widgets(self):
+        
         title_frame = ctk.CTkFrame(self, fg_color="#3B8ED0", corner_radius=0)
         title_frame.pack(fill="x")
         
@@ -537,14 +536,15 @@ class EditBookScreen(Screen):
             form_frame, text="Available", variable=self.availability_var
         )
         availability_checkbox.grid(row=4, columnspan=2, pady=10)
-
+        
+        #Button
         button_frame = ctk.CTkFrame(self)
         button_frame.pack(fill="x", pady=10)
         
         save_button = ctk.CTkButton(button_frame, text="Save Changes", width=120, command=self.save_changes)
         save_button.pack(side="left", padx=10)
         
-        cancel_button = ctk.CTkButton(button_frame, text="Cancel", width=120, command=self.system.show_main_screen)
+        cancel_button = ctk.CTkButton(button_frame, text="Cancel", width=120, command=self.system.show_book_data_screen)
         cancel_button.pack(side="right", padx=10)
 
     def save_changes(self):
@@ -570,7 +570,7 @@ class EditBookScreen(Screen):
                 pickle.dump(all_books, file)
 
             self.main_screen.update_radio_buttons(self.main_screen.load_data_from_file("book_data.pkl", lambda book: book.get("Book Title", "Unknown Title")))
-            self.book_data_screen.load_and_display_books()
+            self.book_data_screen.display_books()
             self.system.show_book_data_screen()
 
 class AddBookScreen(Screen):
@@ -579,9 +579,7 @@ class AddBookScreen(Screen):
         self.system = system
         self.book_data_screen = book_data_screen
         self.main_screen = main
-        self.create_widgets()
-
-    def create_widgets(self):
+        
         title_frame = ctk.CTkFrame(self, fg_color="#3B8ED0", corner_radius=0)
         title_frame.pack(fill="x")  
         title_label = ctk.CTkLabel(title_frame, text="Add Book", font=ctk.CTkFont(size=24, weight="bold"), text_color="white")
@@ -652,7 +650,7 @@ class AddBookScreen(Screen):
             entry.delete(0, "end")
 
         self.main_screen.update_radio_buttons(self.main_screen.load_data_from_file("book_data.pkl", lambda book: book.get("Book Title", "Unknown Title")))
-        self.book_data_screen.load_and_display_books()
+        self.book_data_screen.display_books()
 
 class LibraryManagementSystem:
     def __init__(self):
@@ -664,7 +662,7 @@ class LibraryManagementSystem:
         self.book_data_screen = BookDataScreen(self.root, self, None)
         self.history_screen = HistoryScreen(self.root, self)
         self.addbook_screen = AddBookScreen(self.root, self, self.book_data_screen, None)
-        
+
         self.edit_book_screen = None  
 
         self.main_screen.history_data_screen = self.history_screen
@@ -705,5 +703,4 @@ class LibraryManagementSystem:
         if self.edit_book_screen is not None:
             self.edit_book_screen.hide()
 
-if __name__ == "__main__":
-    LibraryManagementSystem()
+LibraryManagementSystem()
